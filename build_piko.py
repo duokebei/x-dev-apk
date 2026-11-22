@@ -8,7 +8,7 @@ from pathlib import Path
 
 PIKO_REPO = "crimera/piko"
 PIKO_REPOSITORY = f"https://github.com/{PIKO_REPO}.git"
-PIKO_BRANCH = "dev"
+PIKO_REF = os.environ.get("PIKO_REF", "dev")
 XDEV_CONSTANTS = (
     "patches/src/main/kotlin/app/crimera/patches/twitter/utils/Constants.kt"
 )
@@ -63,7 +63,7 @@ def configure_gradle_memory(piko_directory: Path) -> None:
     log(f"Set org.gradle.jvmargs={GRADLE_JVMARGS}")
 
 
-# Clone Piko dev, build patches, and copy the .mpp artifact
+# Clone Piko at PIKO_REF (branch or tag), build patches, copy the .mpp artifact
 def build_piko_patches(output: str = "bins/patches.mpp") -> PikoBuild:
     output_path = Path(output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -72,7 +72,7 @@ def build_piko_patches(output: str = "bins/patches.mpp") -> PikoBuild:
     with tempfile.TemporaryDirectory(prefix="piko-") as temporary_directory:
         piko_directory = Path(temporary_directory) / "piko"
 
-        log(f"Cloning {PIKO_REPO} ({PIKO_BRANCH})...")
+        log(f"Cloning {PIKO_REPO} ({PIKO_REF})...")
         subprocess.run(
             [
                 "git",
@@ -80,7 +80,7 @@ def build_piko_patches(output: str = "bins/patches.mpp") -> PikoBuild:
                 "--depth",
                 "1",
                 "--branch",
-                PIKO_BRANCH,
+                PIKO_REF,
                 PIKO_REPOSITORY,
                 str(piko_directory),
             ],
