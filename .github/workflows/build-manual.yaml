@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       piko_ref:
-        description: 'Piko branch or tag to build (default: dev, e.g. v3.12.0-dev.5)'
+        description: 'Piko branch or tag to build. Leave empty = auto-resolve latest dev tag (e.g. v3.12.0-dev.5)'
         required: false
-        default: 'dev'
+        default: ''
       force_build:
         description: 'Force build even if this version was already released'
         required: false
@@ -22,6 +22,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+
+      - name: Resolve latest Piko tag (when piko_ref is empty)
+        id: resolve
+        run: |
+          if [ -n "${{ inputs.piko_ref }}" ]; then
+            echo "piko_ref=${{ inputs.piko_ref }}" >> "$GITHUB_OUTPUT"
+            echo "Using provided piko_ref: ${{ inputs.piko_ref }}"
+          else
+            tag=$(curl -fsS "https://api.github.com/repos/crimera/piko/tags?per_page=1" \
+              | grep -o '"name": *"[^"]*"' | head -1 | sed 's/.*: *"//;s/"$//')
+            echo "piko_ref=${tag}" >> "$GITHUB_OUTPUT"
+            echo "Auto-resolved latest Piko tag: ${tag}"
+          fi
 
       - name: Set up java
         uses: actions/setup-java@v5
@@ -45,8 +58,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GRADLE_OPTS: -Dorg.gradle.caching=true
-          PIKO_REF: ${{ inputs.piko_ref }}
+          PIKO_REF: ${{ steps.resolve.outputs.piko_ref }}
           FORCE: ${{ inputs.force_build && '1' || '0' }}
+          SKIP_RELEASE: '1'
         run: |
           mkdir -p bins
           uv run main.py
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: piko-build
+          path: |
+            piko-dev-v*.apk
+            patches-*.mpp
+            patches-applied.txt
+          if-no-files-found: warn
